@@ -79,15 +79,16 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-@app.get("/", tags=["General"])
+import pathlib
+from fastapi.responses import HTMLResponse
+
+@app.get("/", tags=["General"], response_class=HTMLResponse)
 async def root():
-    """Welcome endpoint — confirms the API is reachable."""
-    return {
-        "service": "Image Processing API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "message": "Welcome to the DCO Image Processing API. Visit /docs for interactive documentation.",
-    }
+    """Welcome endpoint — returns the modern HTML frontend."""
+    html_path = pathlib.Path(__file__).parent / "frontend.html"
+    if html_path.exists():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"), status_code=200)
+    return HTMLResponse(content="<h1>Frontend UI not found</h1>", status_code=404)
 
 
 @app.get("/health", tags=["General"])

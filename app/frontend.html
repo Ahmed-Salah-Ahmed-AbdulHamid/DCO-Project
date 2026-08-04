@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCO Image Processing API</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --accent: #8b5cf6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .navbar {
+            width: 100%;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .navbar a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.5rem 1.2rem;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .navbar a:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .hero {
+            text-align: center;
+            margin-top: 5rem;
+            margin-bottom: 4rem;
+            padding: 0 1rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            max-width: 1000px;
+            padding: 0 2rem;
+            margin-bottom: 5rem;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .file-drop {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .file-drop:hover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .file-drop input {
+            display: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .slider-container {
+            margin-bottom: 2rem;
+        }
+
+        .slider-container label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        /* Results / Notifications */
+        .result-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 0.9rem;
+            color: #a7f3d0;
+            display: none;
+            word-break: break-all;
+        }
+
+        .result-box.error {
+            color: #fca5a5;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Micro-animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-up {
+            animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        
+        .delay-1 { animation-delay: 0.2s; opacity: 0; }
+        .delay-2 { animation-delay: 0.4s; opacity: 0; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">DCO Optimizer</div>
+        <a href="/docs" target="_blank">View API Docs (Swagger)</a>
+    </nav>
+
+    <header class="hero animate-up">
+        <h1>Cloud Resource<br>Optimizer API</h1>
+        <p>A next-generation FastAPI service handling real-time image processing and cloud infrastructure stress testing via AWS.</p>
+    </header>
+
+    <main class="container">
+        <!-- Upload Card -->
+        <div class="card animate-up delay-1">
+            <h2>✨ Image Processing</h2>
+            <p>Upload any high-res image. The DCO pipeline will dynamically resize it to a thumbnail and securely store it in your AWS S3 Bucket.</p>
+            
+            <div class="file-drop" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <div id="drop-text">
+                    <span style="font-size: 2rem; display:block; margin-bottom: 0.5rem">📥</span>
+                    Drag & Drop or Click to Browse
+                </div>
+                <input type="file" id="file-input" accept="image/*">
+            </div>
+
+            <button class="btn" id="upload-btn">
+                <span id="upload-text">Upload to S3</span>
+                <div class="loader" id="upload-loader"></div>
+            </button>
+            <div class="result-box" id="upload-result"></div>
+        </div>
+
+        <!-- Stress Test Card -->
+        <div class="card animate-up delay-2">
+            <h2>🔥 CPU Stress Test</h2>
+            <p>Simulate high computational loads to trigger AWS CloudWatch alarms and Auto Scaling Group (ASG) scale-out events.</p>
+            
+            <div class="slider-container">
+                <label>
+                    <span>Duration</span>
+                    <span id="duration-val">5s</span>
+                </label>
+                <input type="range" id="duration-slider" min="1" max="30" value="5">
+            </div>
+
+            <button class="btn" id="stress-btn" style="background: linear-gradient(135deg, #f43f5e, #e11d48);">
+                <span id="stress-text">Trigger CPU Load</span>
+                <div class="loader" id="stress-loader"></div>
+            </button>
+            <div class="result-box" id="stress-result"></div>
+        </div>
+    </main>
+
+    <script>
+        // --- Upload Logic ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const dropText = document.getElementById('drop-text');
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadResult = document.getElementById('upload-result');
+        const uploadLoader = document.getElementById('upload-loader');
+        const uploadText = document.getElementById('upload-text');
+
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#3b82f6';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            if (e.dataTransfer.files.length > 0) {
+                selectedFile = e.dataTransfer.files[0];
+                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+            }
+        });
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showResult(uploadResult, 'Please select a file first.', true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            setLoading(uploadBtn, uploadText, uploadLoader, true);
+            
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult(uploadResult, `✅ Success! <br><a href="${data.s3_url}" target="_blank" style="color: #60a5fa; display:block; margin-top: 0.5rem; text-decoration: underline;">View Uploaded Thumbnail in S3</a>`, false);
+                } else {
+                    showResult(uploadResult, `❌ Error: ${data.detail || 'Upload failed'}`, true);
+                }
+            } catch (err) {
+                showResult(uploadResult, `❌ Network Error`, true);
+            } finally {
+                setLoading(uploadBtn, uploadText, uploadLoader, false);
+            }
+        });
+
+        // --- Stress Logic ---
+        const slider = document.getElementById('duration-slider');
+        const durationVal = document.getElementById('duration-val');
+        const stressBtn = document.getElementById('stress-btn');
+        const stressResult = document.getElementById('stress-result');
+        const stressLoader = document.getElementById('stress-loader');
+        const stressText = document.getElementById('stress-text');
+
+        slider.addEventListener('input', (e) => {
+            durationVal.textContent = e.target.value + 's';
+        });
+
+        stressBtn.addEventListener('click', async () => {
+            const duration = slider.value;
+            setLoading(stressBtn, stressText, stressLoader, true);
+            
+            try {
+                const res = await fetch(`/stress?duration=${duration}`);
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult(stressResult, `✅ Completed: <b>${data.iterations_completed.toLocaleString()}</b> math iterations in ${data.duration_seconds.toFixed(2)}s.`, false);
+                } else {
+                    showResult(stressResult, `❌ Error: ${data.detail}`, true);
+                }
+            } catch (err) {
+                showResult(stressResult, `❌ Network Error`, true);
+            } finally {
+                setLoading(stressBtn, stressText, stressLoader, false);
+            }
+        });
+
+        // --- Helpers ---
+        function setLoading(btn, textEl, loaderEl, isLoading) {
+            btn.disabled = isLoading;
+            textEl.style.display = isLoading ? 'none' : 'inline';
+            loaderEl.style.display = isLoading ? 'inline-block' : 'none';
+        }
+
+        function showResult(el, msg, isError) {
+            el.innerHTML = msg;
+            el.style.display = 'block';
+            if (isError) el.classList.add('error');
+            else el.classList.remove('error');
+        }
+    </script>
+</body>
+</html>

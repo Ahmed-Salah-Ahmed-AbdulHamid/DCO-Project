@@ -24,22 +24,16 @@ client = TestClient(app)
 # GET / — Welcome endpoint
 # =========================================================================
 class TestRootEndpoint:
-    """Tests for the welcome / root endpoint."""
+    """Tests for the welcome / root endpoint (Frontend)."""
 
     def test_root_returns_200(self):
         response = client.get("/")
         assert response.status_code == 200
 
-    def test_root_contains_service_name(self):
+    def test_root_returns_html(self):
         response = client.get("/")
-        data = response.json()
-        assert "service" in data
-        assert data["service"] == "Image Processing API"
-
-    def test_root_contains_docs_link(self):
-        response = client.get("/")
-        data = response.json()
-        assert data["docs"] == "/docs"
+        assert "text/html" in response.headers.get("content-type", "")
+        assert "DCO Optimizer" in response.text
 
 
 # =========================================================================
