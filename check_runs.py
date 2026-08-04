@@ -1,6 +1,11 @@
 import urllib.request, json
-url = 'https://api.github.com/repos/Ahmed-Salah-Ahmed-AbdulHamid/DCO-Project/actions/runs'
+
+run_id = '30916887963'
+url = f'https://api.github.com/repos/Ahmed-Salah-Ahmed-AbdulHamid/DCO-Project/actions/runs/{run_id}'
 req = urllib.request.Request(url)
-runs = json.loads(urllib.request.urlopen(req).read())['workflow_runs']
-for r in runs[:5]:
-    print(f"ID: {r['id']} | Status: {r['status']} | Conclusion: {r['conclusion']} | Msg: {r['head_commit']['message'][:40].strip()}")
+req.add_header('Accept', 'application/vnd.github.v3+json')
+run = json.loads(urllib.request.urlopen(req).read())
+print(f"Run #{run['run_number']}")
+print(f"Head SHA: {run['head_sha']}")
+print(f"Message: {run['head_commit']['message']}")
+print(f"Attempt: {run['run_attempt']}")
