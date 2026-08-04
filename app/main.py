@@ -8,6 +8,7 @@ along with a /stress endpoint used for autoscaling and resource-optimiser testin
 
 import os
 import logging
+import io
 from contextlib import asynccontextmanager
 
 import boto3
@@ -15,6 +16,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
+from PIL import Image, UnidentifiedImageError
 
 from utils import cpu_stress_task, generate_s3_key, resize_image_to_thumbnail
 
@@ -109,14 +111,14 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
 
     Returns the public S3 URL of the uploaded thumbnail.
     """
-    # --- Validate content type (input validation first) ---------------------
+    # --- 1. Validate content type -----------------------------------------
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{file.content_type}'. Allowed: {', '.join(sorted(ALLOWED_CONTENT_TYPES))}",
         )
 
-    # --- Read and validate size --------------------------------------------
+    # --- 2. Read and validate size ----------------------------------------
     image_bytes = await file.read()
     size_mb = len(image_bytes) / (1024 * 1024)
     if size_mb > MAX_UPLOAD_SIZE_MB:
@@ -125,21 +127,31 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
             detail=f"File too large ({size_mb:.1f} MB). Maximum allowed is {MAX_UPLOAD_SIZE_MB} MB.",
         )
 
-    # --- Guard: S3 client must be available --------------------------------
+    # --- 3. Validate that the uploaded content is a valid image (Pillow check) ---
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img.verify()
+    except (UnidentifiedImageError, Exception):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image file format. The file could not be verified as a valid image.",
+        )
+
+    # --- 4. Guard: S3 client must be available ----------------------------
     if s3_client is None:
         raise HTTPException(
             status_code=503,
             detail="S3 client is not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
         )
 
-    # --- Resize to thumbnail -----------------------------------------------
+    # --- 5. Resize to thumbnail -------------------------------------------
     try:
         thumbnail_buffer = resize_image_to_thumbnail(image_bytes, size=(128, 128))
     except Exception as exc:
         logger.error("Image processing failed: %s", exc)
         raise HTTPException(status_code=422, detail=f"Failed to process image: {exc}")
 
-    # --- Upload to S3 -------------------------------------------------------
+    # --- 6. Upload to S3 --------------------------------------------------
     s3_key = generate_s3_key(file.filename or "image")
     try:
         s3_client.put_object(

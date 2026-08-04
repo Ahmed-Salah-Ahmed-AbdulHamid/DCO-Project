@@ -4,6 +4,8 @@ utils.py - Helper functions for image processing operations.
 Part of the DCO (DevOps-Enabled Cloud Resource Optimizer) system.
 """
 
+from __future__ import annotations
+
 import io
 import math
 import time
