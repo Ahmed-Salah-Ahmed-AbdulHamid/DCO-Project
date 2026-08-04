@@ -37,3 +37,8 @@ output "app_url" {
   description = "URL to access the running FastAPI application."
   value       = "http://${aws_instance.dco_server.public_ip}"
 }
+
+output "alb_dns_name" {
+  description = "The DNS name of the Application Load Balancer."
+  value       = aws_lb.dco_alb.dns_name
+}

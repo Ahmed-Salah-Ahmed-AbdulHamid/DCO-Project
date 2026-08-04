@@ -127,6 +127,7 @@ class TestUploadEndpoint:
     def test_upload_success(self, mock_s3_client):
         """Test successful upload with a mocked S3 client."""
         mock_s3_client.put_object.return_value = {}
+        mock_s3_client.generate_presigned_url.return_value = "https://mock-presigned-url"
         image_buf = self._create_test_image()
 
         response = client.post(
@@ -144,6 +145,7 @@ class TestUploadEndpoint:
 
     def test_upload_returns_correct_s3_key_prefix(self, mock_s3_client):
         mock_s3_client.put_object.return_value = {}
+        mock_s3_client.generate_presigned_url.return_value = "https://mock-presigned-url"
         image_buf = self._create_test_image()
 
         response = client.post(
@@ -154,6 +156,25 @@ class TestUploadEndpoint:
         data = response.json()
         assert data["s3_key"].startswith("thumbnails/")
         assert "photo" in data["s3_key"]
+
+
+# =========================================================================
+# GET /resources — Live Metrics
+# =========================================================================
+class TestResourcesEndpoint:
+    """Tests for the live resource metrics dashboard endpoint."""
+
+    @patch("main.psutil")
+    def test_resources_returns_200(self, mock_psutil):
+        mock_psutil.cpu_percent.return_value = 15.0
+        mock_psutil.virtual_memory.return_value.percent = 45.0
+        
+        response = client.get("/resources")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["cpu_percent"] == 15.0
+        assert data["memory_percent"] == 45.0
 
 
 # =========================================================================

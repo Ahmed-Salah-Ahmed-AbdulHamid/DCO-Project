@@ -336,3 +336,87 @@ resource "aws_instance" "dco_server" {
     Name = "${var.project_name}-server"
   }
 }
+
+# ==========================================================================
+# 6. APPLICATION LOAD BALANCER (ALB)
+# ==========================================================================
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_security_group" "dco_alb_sg" {
+  name        = "${var.project_name}-alb-sg"
+  description = "Security group for the Application Load Balancer"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    description = "HTTP access from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "All outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-alb-sg"
+  }
+}
+
+resource "aws_lb" "dco_alb" {
+  name               = "${var.project_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.dco_alb_sg.id]
+  subnets            = data.aws_subnets.default.ids
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "${var.project_name}-alb"
+  }
+}
+
+resource "aws_lb_target_group" "dco_tg" {
+  name     = "${var.project_name}-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.default.id
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
+}
+
+resource "aws_lb_listener" "dco_listener" {
+  load_balancer_arn = aws_lb.dco_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.dco_tg.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "dco_tg_attachment" {
+  target_group_arn = aws_lb_target_group.dco_tg.arn
+  target_id        = aws_instance.dco_server.id
+  port             = 80
+}

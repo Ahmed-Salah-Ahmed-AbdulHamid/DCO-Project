@@ -278,8 +278,38 @@
     </header>
 
     <main class="container">
-        <!-- Upload Card -->
+        <!-- Dashboard Card (NEW) -->
         <div class="card animate-up delay-1">
+            <h2>📈 Live Resource Dashboard</h2>
+            <p>Real-time telemetry from the AWS EC2 instance running this FastAPI service.</p>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600;">
+                    <span>CPU Utilization</span>
+                    <span id="cpu-val">0%</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                    <div id="cpu-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #60a5fa); transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+
+            <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600;">
+                    <span>Memory Utilization</span>
+                    <span id="mem-val">0%</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                    <div id="mem-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #8b5cf6, #c084fc); transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+                <span id="dashboard-status">🟢 Live (Polling every 2s)</span>
+            </div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card animate-up delay-2">
             <h2>✨ Image Processing</h2>
             <p>Upload any high-res image. The DCO pipeline will dynamically resize it to a thumbnail and securely store it in your AWS S3 Bucket.</p>
             
@@ -296,10 +326,16 @@
                 <div class="loader" id="upload-loader"></div>
             </button>
             <div class="result-box" id="upload-result"></div>
+            
+            <!-- Image Preview Container -->
+            <div id="image-preview-container" style="display: none; margin-top: 1.5rem; text-align: center;">
+                <p style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 600;">Generated Thumbnail (128x128):</p>
+                <img id="image-preview" src="" alt="Thumbnail Preview" style="border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 128px; max-height: 128px; border: 2px solid rgba(255,255,255,0.1);">
+            </div>
         </div>
 
         <!-- Stress Test Card -->
-        <div class="card animate-up delay-2">
+        <div class="card animate-up delay-3">
             <h2>🔥 CPU Stress Test</h2>
             <p>Simulate high computational loads to trigger AWS CloudWatch alarms and Auto Scaling Group (ASG) scale-out events.</p>
             
@@ -320,6 +356,35 @@
     </main>
 
     <script>
+        // --- Dashboard Logic ---
+        const cpuVal = document.getElementById('cpu-val');
+        const cpuBar = document.getElementById('cpu-bar');
+        const memVal = document.getElementById('mem-val');
+        const memBar = document.getElementById('mem-bar');
+        const dashboardStatus = document.getElementById('dashboard-status');
+
+        async function fetchResources() {
+            try {
+                const res = await fetch('/resources');
+                const data = await res.json();
+                if (res.ok) {
+                    cpuVal.textContent = data.cpu_percent + '%';
+                    cpuBar.style.width = data.cpu_percent + '%';
+                    
+                    memVal.textContent = data.memory_percent + '%';
+                    memBar.style.width = data.memory_percent + '%';
+                    
+                    dashboardStatus.innerHTML = '🟢 Live (Polling every 2s)';
+                    dashboardStatus.style.color = '#a7f3d0';
+                }
+            } catch (err) {
+                dashboardStatus.innerHTML = '🔴 Connection Error';
+                dashboardStatus.style.color = '#fca5a5';
+            }
+        }
+        setInterval(fetchResources, 2000);
+        fetchResources(); // Initial fetch
+
         // --- Upload Logic ---
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
@@ -328,6 +393,8 @@
         const uploadResult = document.getElementById('upload-result');
         const uploadLoader = document.getElementById('upload-loader');
         const uploadText = document.getElementById('upload-text');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
 
         let selectedFile = null;
 
@@ -335,6 +402,7 @@
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
                 dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+                imagePreviewContainer.style.display = 'none';
             }
         });
 
@@ -353,6 +421,7 @@
             if (e.dataTransfer.files.length > 0) {
                 selectedFile = e.dataTransfer.files[0];
                 dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+                imagePreviewContainer.style.display = 'none';
             }
         });
 
@@ -366,6 +435,7 @@
             formData.append('file', selectedFile);
 
             setLoading(uploadBtn, uploadText, uploadLoader, true);
+            imagePreviewContainer.style.display = 'none';
             
             try {
                 const res = await fetch('/upload', {
@@ -375,7 +445,9 @@
                 const data = await res.json();
                 
                 if (res.ok) {
-                    showResult(uploadResult, `✅ Success! <br><a href="${data.s3_url}" target="_blank" style="color: #60a5fa; display:block; margin-top: 0.5rem; text-decoration: underline;">View Uploaded Thumbnail in S3</a>`, false);
+                    showResult(uploadResult, `✅ Success!`, false);
+                    imagePreview.src = data.s3_url;
+                    imagePreviewContainer.style.display = 'block';
                 } else {
                     showResult(uploadResult, `❌ Error: ${data.detail || 'Upload failed'}`, true);
                 }

@@ -15,6 +15,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
+import psutil
 
 from utils import cpu_stress_task, generate_s3_key, resize_image_to_thumbnail
 
@@ -153,8 +154,18 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
         logger.error("S3 upload failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}")
 
-    s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
-    logger.info("Thumbnail uploaded → %s", s3_url)
+    # Generate presigned URL for secure frontend access
+    try:
+        s3_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
+            ExpiresIn=3600
+        )
+    except Exception as exc:
+        logger.error("Failed to generate presigned URL: %s", exc)
+        s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+
+    logger.info("Thumbnail uploaded → %s", s3_key)
 
     return JSONResponse(
         status_code=201,
@@ -191,3 +202,12 @@ async def stress_test(
     result = cpu_stress_task(duration_seconds=duration)
     logger.info("Stress test finished: %s", result["message"])
     return result
+
+
+@app.get("/resources", tags=["DevOps / Testing"])
+async def get_resources():
+    """Returns live CPU and Memory utilization for the dashboard."""
+    return {
+        "cpu_percent": psutil.cpu_percent(interval=0.1),
+        "memory_percent": psutil.virtual_memory().percent
+    }
