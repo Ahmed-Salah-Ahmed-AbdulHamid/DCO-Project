@@ -152,78 +152,33 @@ jobs:
     needs: build-and-push
 
     steps:
-      # ----- Deploy via SSH -----------------------------------------------
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          ENV_AWS_REGION: ${{ secrets.AWS_REGION }}
-          ENV_AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          ENV_ECR_REPOSITORY_NAME: ${{ secrets.ECR_REPOSITORY_NAME }}
-          ENV_S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      # ----- Deploy via ASG Instance Refresh ------------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: ENV_AWS_REGION,ENV_AWS_ACCOUNT_ID,ENV_ECR_REPOSITORY_NAME,ENV_S3_BUCKET_NAME
-          port: 22
-          script_stop: true
-          script: |
-            set -euxo pipefail
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            # ============================================================
-            # Sanitize Variables (Remove accidental spaces/newlines from secrets)
-            # ============================================================
-            AWS_REGION=$(echo "$ENV_AWS_REGION" | tr -d '\n\r ')
-            AWS_ACCOUNT_ID=$(echo "$ENV_AWS_ACCOUNT_ID" | tr -d '\n\r ')
-            ECR_REPOSITORY_NAME=$(echo "$ENV_ECR_REPOSITORY_NAME" | tr -d '\n\r ')
-            S3_BUCKET=$(echo "$ENV_S3_BUCKET_NAME" | tr -d '\n\r ')
+      - name: Start ASG Instance Refresh
+        run: |
+          set -euxo pipefail
+          echo ">>> Triggering Auto Scaling Group Instance Refresh..."
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name dco-asg \
+            --strategy Rolling \
+            --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 120}'
 
-            ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-            ECR_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY_NAME}:latest"
-            CONTAINER_NAME="dco-api"
-
-            echo ">>> [1/5] Authenticating with ECR..."
-            aws ecr get-login-password --region ${AWS_REGION} | \
-              docker login --username AWS --password-stdin ${ECR_REGISTRY}
-
-            echo ">>> [2/5] Pulling latest image..."
-            docker pull ${ECR_IMAGE}
-
-            echo ">>> [3/5] Stopping existing container (if any)..."
-            docker stop ${CONTAINER_NAME} 2>/dev/null || true
-            docker rm ${CONTAINER_NAME} 2>/dev/null || true
-
-            echo ">>> [4/5] Starting new container..."
-            docker run -d \
-              --name ${CONTAINER_NAME} \
-              --restart unless-stopped \
-              -p 80:8000 \
-              -e AWS_REGION=${AWS_REGION} \
-              -e S3_BUCKET_NAME=${S3_BUCKET} \
-              ${ECR_IMAGE}
-
-            echo ">>> [5/5] Verifying deployment..."
-            sleep 5
-            if curl -sf http://localhost/health | grep -q "UP"; then
-              echo "✅ Health check passed — deployment successful!"
-            else
-              echo "❌ Health check failed!"
-              docker logs ${CONTAINER_NAME} --tail 20
-              exit 1
-            fi
-
-            echo ">>> Cleaning up old images..."
-            docker image prune -af --filter "until=24h"
+          echo ">>> Instance refresh started successfully. The new Docker image will be pulled by the new instances."
 
       # ----- Deployment summary -------------------------------------------
       - name: Deployment summary
         run: |
-          echo "### 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Deployment Triggered" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Server** | \`${{ secrets.EC2_HOST }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **App URL** | http://${{ secrets.EC2_HOST }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **API Docs** | http://${{ secrets.EC2_HOST }}/docs |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target ASG** | \`dco-asg\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | Rolling Refresh Started |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY

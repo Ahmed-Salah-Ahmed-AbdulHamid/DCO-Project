@@ -197,6 +197,23 @@
             transform: none;
         }
 
+        .btn-extreme {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            animation: pulse 2s infinite;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
         .slider-container {
             margin-bottom: 2rem;
         }
@@ -351,6 +368,10 @@
                 <span id="stress-text">Trigger CPU Load</span>
                 <div class="loader" id="stress-loader"></div>
             </button>
+            <button class="btn btn-extreme" id="extreme-btn">
+                <span id="extreme-text">🔥 Nuke CPU (Extreme Stress)</span>
+                <div class="loader" id="extreme-loader"></div>
+            </button>
             <div class="result-box" id="stress-result"></div>
         </div>
     </main>
@@ -487,6 +508,34 @@
                 showResult(stressResult, `❌ Network Error`, true);
             } finally {
                 setLoading(stressBtn, stressText, stressLoader, false);
+            }
+        });
+
+        // --- Extreme Stress Logic ---
+        const extremeBtn = document.getElementById('extreme-btn');
+        const extremeText = document.getElementById('extreme-text');
+        const extremeLoader = document.getElementById('extreme-loader');
+
+        extremeBtn.addEventListener('click', async () => {
+            setLoading(extremeBtn, extremeText, extremeLoader, true);
+            showResult(stressResult, `⚠️ Sending 10 parallel heavy requests to peg CPU at 100%...`, false);
+            stressResult.style.color = '#f59e0b';
+            
+            try {
+                // Fire 10 parallel requests of 20 seconds each
+                const promises = [];
+                for (let i = 0; i < 10; i++) {
+                    promises.push(fetch(`/stress?duration=20`));
+                }
+                
+                // Wait for all to finish
+                await Promise.all(promises);
+                
+                showResult(stressResult, `✅ Extreme Stress Completed! Auto Scaling should be triggering soon.`, false);
+            } catch (err) {
+                showResult(stressResult, `❌ Extreme Stress Failed (Network Error / Timeout)`, true);
+            } finally {
+                setLoading(extremeBtn, extremeText, extremeLoader, false);
             }
         });
 

@@ -180,7 +180,7 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
 
 
 @app.get("/stress", tags=["DevOps / Testing"])
-async def stress_test(
+def stress_test(
     duration: int = Query(
         default=5,
         ge=1,

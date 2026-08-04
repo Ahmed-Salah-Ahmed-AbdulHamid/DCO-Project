@@ -43,6 +43,9 @@ data "aws_vpc" "default" {
   default = true
 }
 
+# Current AWS region (used in ECR pull and CloudWatch dashboard)
+data "aws_region" "current" {}
+
 # ==========================================================================
 # 1. S3 BUCKET
 # ==========================================================================
@@ -253,87 +256,135 @@ resource "aws_key_pair" "dco_key" {
   public_key = file("dco-key.pub")
 }
 
-resource "aws_instance" "dco_server" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  iam_instance_profile   = aws_iam_instance_profile.dco_ec2_profile.name
-  vpc_security_group_ids = [aws_security_group.dco_sg.id]
+resource "aws_launch_template" "dco_lt" {
+  name_prefix   = "${var.project_name}-lt-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  key_name      = aws_key_pair.dco_key.key_name
 
-  # Attach the newly created key pair
-  key_name = aws_key_pair.dco_key.key_name
-
-  # 20 GB root volume (gp3 for better baseline IOPS)
-  root_block_device {
-    volume_size           = 20
-    volume_type           = "gp3"
-    delete_on_termination = true
-    encrypted             = true
+  iam_instance_profile {
+    name = aws_iam_instance_profile.dco_ec2_profile.name
   }
 
-  # Enable detailed CloudWatch monitoring (useful for Phase 3+)
-  monitoring = true
+  vpc_security_group_ids = [aws_security_group.dco_sg.id]
 
-  # --- User Data: Bootstrap Docker on first boot -------------------------
-  user_data = <<-USERDATA
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size           = 20
+      volume_type           = "gp3"
+      delete_on_termination = true
+      encrypted             = true
+    }
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  user_data = base64encode(<<-USERDATA
     #!/bin/bash
     set -euxo pipefail
 
-    # ====================================================================
-    # DCO Bootstrap Script — Ubuntu 22.04 LTS
-    # Installs Docker, AWS CLI, and prepares the instance to run
-    # the containerised FastAPI application.
-    # ====================================================================
-
-    echo ">>> [1/6] Updating system packages..."
+    echo ">>> [1/7] Updating system packages..."
     apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
-    echo ">>> [2/6] Installing prerequisites..."
-    apt-get install -y \
-      ca-certificates \
-      curl \
-      gnupg \
-      lsb-release \
-      unzip
+    echo ">>> [2/7] Installing prerequisites..."
+    apt-get install -y ca-certificates curl gnupg lsb-release unzip jq
 
-    echo ">>> [3/6] Installing Docker (official repository)..."
+    echo ">>> [3/7] Installing Docker (official repository)..."
     install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
 
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | \
-      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
     apt-get update -y
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    apt-get install -y docker-ce docker-ce-cli containerd.io
 
-    echo ">>> [4/6] Starting and enabling Docker service..."
     systemctl start docker
     systemctl enable docker
-
-    echo ">>> [5/6] Adding 'ubuntu' user to the docker group..."
     usermod -aG docker ubuntu
 
-    echo ">>> [6/6] Installing AWS CLI v2..."
+    echo ">>> [4/7] Installing AWS CLI v2..."
     curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
     unzip -qo /tmp/awscliv2.zip -d /tmp
     /tmp/aws/install --update
     rm -rf /tmp/awscliv2.zip /tmp/aws
 
-    echo ">>> Bootstrap complete! Docker version:"
-    docker --version
-    echo ">>> AWS CLI version:"
-    aws --version
+    echo ">>> [5/7] Authenticating with ECR..."
+    export AWS_DEFAULT_REGION=${data.aws_region.current.name}
+    ECR_REGISTRY="${data.aws_caller_identity.current.account_id}.dkr.ecr.$${AWS_DEFAULT_REGION}.amazonaws.com"
+    aws ecr get-login-password --region $${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin $${ECR_REGISTRY}
+
+    echo ">>> [6/7] Pulling latest Docker image..."
+    ECR_IMAGE="$${ECR_REGISTRY}/${var.ecr_repository_name}:latest"
+    # Try to pull up to 3 times in case ECR image doesn't exist yet
+    for i in 1 2 3; do docker pull $${ECR_IMAGE} && break || sleep 10; done
+
+    echo ">>> [7/7] Running the container..."
+    docker run -d \
+      --name dco-api \
+      --restart unless-stopped \
+      -p 80:8000 \
+      -e AWS_REGION=$${AWS_DEFAULT_REGION} \
+      -e S3_BUCKET_NAME=${var.s3_bucket_name} \
+      $${ECR_IMAGE}
+
+    echo ">>> Bootstrap complete!"
   USERDATA
+  )
 
-  user_data_replace_on_change = true
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "${var.project_name}-server"
+    }
+  }
+}
 
-  tags = {
-    Name = "${var.project_name}-server"
+resource "aws_autoscaling_group" "dco_asg" {
+  name                = "${var.project_name}-asg"
+  vpc_zone_identifier = data.aws_subnets.default.ids
+  target_group_arns   = [aws_lb_target_group.dco_tg.arn]
+  
+  min_size         = 1
+  max_size         = 3
+  desired_capacity = 1
+
+  health_check_type         = "ELB"
+  health_check_grace_period = 120
+
+  launch_template {
+    id      = aws_launch_template.dco_lt.id
+    version = "$Latest"
+  }
+
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+    }
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-asg-instance"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_policy" "dco_cpu_policy" {
+  name                   = "${var.project_name}-cpu-policy"
+  autoscaling_group_name = aws_autoscaling_group.dco_asg.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+    target_value = 50.0
   }
 }
 
@@ -415,8 +466,70 @@ resource "aws_lb_listener" "dco_listener" {
   }
 }
 
-resource "aws_lb_target_group_attachment" "dco_tg_attachment" {
-  target_group_arn = aws_lb_target_group.dco_tg.arn
-  target_id        = aws_instance.dco_server.id
-  port             = 80
+# ==========================================================================
+# 7. SNS ALERTS & CLOUDWATCH DASHBOARD
+# ==========================================================================
+
+resource "aws_sns_topic" "dco_alerts" {
+  name = "${var.project_name}-alerts"
+}
+
+resource "aws_sns_topic_subscription" "dco_email_alert" {
+  topic_arn = aws_sns_topic.dco_alerts.arn
+  protocol  = "email"
+  endpoint  = "eng.ahmedsalah.j@gmail.com"
+}
+
+resource "aws_autoscaling_notification" "dco_asg_notifications" {
+  group_names = [aws_autoscaling_group.dco_asg.name]
+
+  notifications = [
+    "autoscaling:EC2_INSTANCE_LAUNCH",
+    "autoscaling:EC2_INSTANCE_TERMINATE",
+    "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+    "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+  ]
+
+  topic_arn = aws_sns_topic.dco_alerts.arn
+}
+
+resource "aws_cloudwatch_dashboard" "dco_dashboard" {
+  dashboard_name = "${var.project_name}-dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.dco_asg.name]
+          ]
+          period = 60
+          stat   = "Average"
+          region = data.aws_region.current.name
+          title  = "ASG Average CPU Utilization"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.dco_alb.arn_suffix]
+          ]
+          period = 60
+          stat   = "Sum"
+          region = data.aws_region.current.name
+          title  = "Total Requests"
+        }
+      }
+    ]
+  })
 }

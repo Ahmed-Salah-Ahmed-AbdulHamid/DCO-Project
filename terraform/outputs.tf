@@ -1,17 +1,7 @@
 # ==========================================================================
 # outputs.tf — Exported Values
-# DCO Phase 2: Infrastructure Provisioning
+# DCO Phase 2/6: Infrastructure Provisioning
 # ==========================================================================
-
-output "ec2_public_ip" {
-  description = "Public IPv4 address of the DCO EC2 instance."
-  value       = aws_instance.dco_server.public_ip
-}
-
-output "ec2_public_dns" {
-  description = "Public DNS hostname of the DCO EC2 instance."
-  value       = aws_instance.dco_server.public_dns
-}
 
 output "ecr_repository_url" {
   description = "Full URI of the ECR repository (used in docker push)."
@@ -28,17 +18,12 @@ output "s3_bucket_arn" {
   value       = aws_s3_bucket.images.arn
 }
 
-output "ssh_command" {
-  description = "Quick SSH command to connect to the instance."
-  value       = var.key_pair_name != "" ? "ssh -i <your-key>.pem ubuntu@${aws_instance.dco_server.public_ip}" : "No key pair configured — SSH key-based login disabled."
-}
-
-output "app_url" {
-  description = "URL to access the running FastAPI application."
-  value       = "http://${aws_instance.dco_server.public_ip}"
-}
-
 output "alb_dns_name" {
   description = "The DNS name of the Application Load Balancer."
   value       = aws_lb.dco_alb.dns_name
+}
+
+output "app_url" {
+  description = "URL to access the running FastAPI application through the ALB."
+  value       = "http://${aws_lb.dco_alb.dns_name}"
 }
