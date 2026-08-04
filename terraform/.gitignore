@@ -12,3 +12,5 @@ override.tf.json
 *_override.tf.json
 dco-key
 dco-key.pub
+dco-key
+dco-key.pub

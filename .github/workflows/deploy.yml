@@ -110,7 +110,8 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euxo pipefail
-          FULL_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          SAFE_REPO=$(echo "${ECR_REPOSITORY}" | tr -d '\n\r ')
+          FULL_IMAGE="${ECR_REGISTRY}/${SAFE_REPO}"
           TAG="${FULL_IMAGE}:${IMAGE_TAG}"
           LATEST="${FULL_IMAGE}:latest"
 
