@@ -18,7 +18,7 @@ on:
 # Cancel any in-progress runs on the same branch
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # ---------------------------------------------------------------------------
 # Environment variables shared across all jobs
@@ -108,10 +108,11 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
+          DOCKER_BUILDKIT: "0"
         run: |
           FULL_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
 
-          echo "Building image: ${FULL_IMAGE}"
+          echo "Building image: ${FULL_IMAGE}:${IMAGE_TAG}"
           docker build -t "${FULL_IMAGE}:${IMAGE_TAG}" .
           docker tag "${FULL_IMAGE}:${IMAGE_TAG}" "${FULL_IMAGE}:latest"
 
