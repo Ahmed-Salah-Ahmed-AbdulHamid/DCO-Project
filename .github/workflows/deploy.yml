@@ -154,23 +154,32 @@ jobs:
       # ----- Deploy via SSH -----------------------------------------------
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          ENV_AWS_REGION: ${{ secrets.AWS_REGION }}
+          ENV_AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ENV_ECR_REPOSITORY_NAME: ${{ secrets.ECR_REPOSITORY_NAME }}
+          ENV_S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: ENV_AWS_REGION,ENV_AWS_ACCOUNT_ID,ENV_ECR_REPOSITORY_NAME,ENV_S3_BUCKET_NAME
           port: 22
           script_stop: true
           script: |
             set -euxo pipefail
 
             # ============================================================
-            # Variables
+            # Sanitize Variables (Remove accidental spaces/newlines from secrets)
             # ============================================================
-            AWS_REGION="${{ secrets.AWS_REGION }}"
-            ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-            ECR_IMAGE="${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY_NAME }}:latest"
+            AWS_REGION=$(echo "$ENV_AWS_REGION" | tr -d '\n\r ')
+            AWS_ACCOUNT_ID=$(echo "$ENV_AWS_ACCOUNT_ID" | tr -d '\n\r ')
+            ECR_REPOSITORY_NAME=$(echo "$ENV_ECR_REPOSITORY_NAME" | tr -d '\n\r ')
+            S3_BUCKET=$(echo "$ENV_S3_BUCKET_NAME" | tr -d '\n\r ')
+
+            ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+            ECR_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY_NAME}:latest"
             CONTAINER_NAME="dco-api"
-            S3_BUCKET="${{ secrets.S3_BUCKET_NAME }}"
 
             echo ">>> [1/5] Authenticating with ECR..."
             aws ecr get-login-password --region ${AWS_REGION} | \
