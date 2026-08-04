@@ -109,14 +109,7 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
 
     Returns the public S3 URL of the uploaded thumbnail.
     """
-    # --- Guard: S3 client must be available --------------------------------
-    if s3_client is None:
-        raise HTTPException(
-            status_code=503,
-            detail="S3 client is not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
-        )
-
-    # --- Validate content type ---------------------------------------------
+    # --- Validate content type (input validation first) ---------------------
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
@@ -130,6 +123,13 @@ async def upload_image(file: UploadFile = File(..., description="Image file to p
         raise HTTPException(
             status_code=413,
             detail=f"File too large ({size_mb:.1f} MB). Maximum allowed is {MAX_UPLOAD_SIZE_MB} MB.",
+        )
+
+    # --- Guard: S3 client must be available --------------------------------
+    if s3_client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="S3 client is not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
         )
 
     # --- Resize to thumbnail -----------------------------------------------
