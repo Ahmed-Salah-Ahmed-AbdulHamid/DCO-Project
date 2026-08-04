@@ -245,16 +245,22 @@ resource "aws_security_group" "dco_sg" {
 }
 
 # ==========================================================================
-# 5. EC2 INSTANCE
+# 5. EC2 INSTANCE & KEY PAIR
 # ==========================================================================
+
+resource "aws_key_pair" "dco_key" {
+  key_name   = "dco-key"
+  public_key = file("dco-key.pub")
+}
+
 resource "aws_instance" "dco_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   iam_instance_profile   = aws_iam_instance_profile.dco_ec2_profile.name
   vpc_security_group_ids = [aws_security_group.dco_sg.id]
 
-  # Conditionally attach a key pair (empty string = no key pair)
-  key_name = var.key_pair_name != "" ? var.key_pair_name : null
+  # Attach the newly created key pair
+  key_name = aws_key_pair.dco_key.key_name
 
   # 20 GB root volume (gp3 for better baseline IOPS)
   root_block_device {

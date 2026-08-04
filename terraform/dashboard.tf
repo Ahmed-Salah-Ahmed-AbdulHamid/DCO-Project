@@ -13,21 +13,6 @@
 # ==========================================================================
 
 # --------------------------------------------------------------------------
-# Data: Look up the EC2 instance ID dynamically
-# --------------------------------------------------------------------------
-data "aws_instance" "dco_server" {
-  filter {
-    name   = "tag:Name"
-    values = ["${var.project_name}-server"]
-  }
-
-  filter {
-    name   = "instance-state-name"
-    values = ["running"]
-  }
-}
-
-# --------------------------------------------------------------------------
 # CloudWatch Dashboard
 # --------------------------------------------------------------------------
 resource "aws_cloudwatch_dashboard" "dco_monitor" {
