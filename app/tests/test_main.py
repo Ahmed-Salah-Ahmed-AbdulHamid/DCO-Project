@@ -98,6 +98,20 @@ class TestStressEndpoint:
 class TestUploadEndpoint:
     """Tests for the image upload and S3 storage endpoint."""
 
+    @pytest.fixture(autouse=True)
+    def mock_s3_client(self):
+        """
+        Ensure `main.s3_client` is a MagicMock for every test in this class.
+
+        The real client is only created inside the FastAPI `lifespan`
+        context manager, which never runs against a plain `TestClient(app)`
+        instance — so without this fixture, `main.s3_client` stays `None`
+        and any test that reaches the S3-availability guard gets a 503
+        instead of whatever status the test actually meant to check.
+        """
+        with patch("main.s3_client", MagicMock()) as mock_s3:
+            yield mock_s3
+
     def _create_test_image(self, format: str = "PNG") -> io.BytesIO:
         """Generate a small in-memory test image."""
         from PIL import Image
@@ -116,10 +130,9 @@ class TestUploadEndpoint:
         assert response.status_code == 400
         assert "Unsupported file type" in response.json()["detail"]
 
-    @patch("main.s3_client")
-    def test_upload_success(self, mock_s3):
+    def test_upload_success(self, mock_s3_client):
         """Test successful upload with a mocked S3 client."""
-        mock_s3.put_object.return_value = {}
+        mock_s3_client.put_object.return_value = {}
         image_buf = self._create_test_image()
 
         response = client.post(
@@ -135,9 +148,8 @@ class TestUploadEndpoint:
         assert "s3_url" in data
         assert "s3_key" in data
 
-    @patch("main.s3_client")
-    def test_upload_returns_correct_s3_key_prefix(self, mock_s3):
-        mock_s3.put_object.return_value = {}
+    def test_upload_returns_correct_s3_key_prefix(self, mock_s3_client):
+        mock_s3_client.put_object.return_value = {}
         image_buf = self._create_test_image()
 
         response = client.post(
