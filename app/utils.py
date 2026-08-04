@@ -57,13 +57,25 @@ def generate_s3_key(original_filename: str) -> str:
     return f"thumbnails/{timestamp}_{base_name}.png"
 
 
+def _burn_cpu(duration_seconds: int):
+    """Worker function that burns CPU for the given duration."""
+    start = time.time()
+    iterations = 0
+    while (time.time() - start) < duration_seconds:
+        # Tight loop with heavy math to max out CPU
+        _ = math.sqrt(iterations) * math.sin(iterations) * math.cos(iterations)
+        _ = math.pow(iterations % 1000, 3)
+        iterations += 1
+    return iterations
+
+
 def cpu_stress_task(duration_seconds: int = 5) -> dict:
     """
     Perform a CPU-intensive computation for the given duration.
 
-    This deliberately pins a CPU core to simulate high utilisation, which is
-    used to trigger autoscaling alerts and test the Resource Optimizer
-    component of the DCO system.
+    Uses multiprocessing to spawn one worker per CPU core, ensuring
+    100% CPU utilisation across ALL cores. This is critical for
+    triggering AWS Auto Scaling policies.
 
     Args:
         duration_seconds: How long (in seconds) to run the heavy loop.
@@ -71,19 +83,25 @@ def cpu_stress_task(duration_seconds: int = 5) -> dict:
     Returns:
         A dict with timing and computation metadata.
     """
+    import multiprocessing
+    import os
+
+    num_workers = os.cpu_count() or 1
     start = time.time()
-    iterations = 0
 
-    # Heavy math loop — runs until the wall-clock duration is exceeded.
-    while (time.time() - start) < duration_seconds:
-        # Intentionally expensive: trigonometric + power operations.
-        _ = math.sqrt(iterations) * math.sin(iterations) * math.cos(iterations)
-        _ = math.pow(iterations % 1000, 3)
-        iterations += 1
+    # Spawn one process per CPU core, each burning CPU independently
+    with multiprocessing.Pool(processes=num_workers) as pool:
+        results = pool.starmap(
+            _burn_cpu,
+            [(duration_seconds,)] * num_workers
+        )
 
+    total_iterations = sum(results)
     elapsed = round(time.time() - start, 2)
     return {
-        "iterations_completed": iterations,
+        "iterations_completed": total_iterations,
         "duration_seconds": elapsed,
-        "message": f"CPU stress test completed: {iterations:,} iterations in {elapsed}s",
+        "workers": num_workers,
+        "message": f"CPU stress test completed: {total_iterations:,} iterations across {num_workers} cores in {elapsed}s",
     }
+
