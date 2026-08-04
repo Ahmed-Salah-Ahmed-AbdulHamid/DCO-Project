@@ -1,0 +1,21 @@
+# ==========================================================================
+# terraform.tfvars.example
+# Copy this file to terraform.tfvars and customise the values.
+# ==========================================================================
+
+aws_region       = "us-east-1"
+environment      = "dev"
+project_name     = "dco"
+
+# S3 — must be globally unique; change this to something unique to you
+s3_bucket_name   = "dco-image-processing-bucket-YOUR-UNIQUE-ID"
+
+# ECR
+ecr_repository_name = "dco-image-processing-api"
+
+# EC2
+instance_type    = "t2.micro"  # Free Tier eligible
+key_pair_name    = ""           # Set to your EC2 Key Pair name for SSH access
+
+# Security — restrict to your IP in production (e.g., "203.0.113.5/32")
+allowed_ssh_cidr = "0.0.0.0/0"

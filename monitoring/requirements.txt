@@ -1,0 +1,2 @@
+locust>=2.20
+Pillow>=10.0
