@@ -1,29 +1,29 @@
-# ==========================================================================
-# outputs.tf — Exported Values
-# DCO Phase 2/6: Infrastructure Provisioning
-# ==========================================================================
+output "eks_cluster_name" {
+  description = "Name of the EKS cluster"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "Endpoint for EKS control plane"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_cluster_security_group_id" {
+  description = "Security group ID attached to the EKS cluster"
+  value       = module.eks.cluster_security_group_id
+}
 
 output "ecr_repository_url" {
-  description = "Full URI of the ECR repository (used in docker push)."
+  description = "ECR Repository URL for Docker images"
   value       = aws_ecr_repository.dco_api.repository_url
 }
 
 output "s3_bucket_name" {
-  description = "Name of the S3 bucket for processed images."
+  description = "Name of the S3 bucket created for images"
   value       = aws_s3_bucket.images.id
 }
 
 output "s3_bucket_arn" {
-  description = "ARN of the S3 bucket (useful for additional IAM policies)."
+  description = "ARN of the S3 bucket created for images"
   value       = aws_s3_bucket.images.arn
-}
-
-output "alb_dns_name" {
-  description = "The DNS name of the Application Load Balancer."
-  value       = aws_lb.dco_alb.dns_name
-}
-
-output "app_url" {
-  description = "URL to access the running FastAPI application through the ALB."
-  value       = "http://${aws_lb.dco_alb.dns_name}"
 }

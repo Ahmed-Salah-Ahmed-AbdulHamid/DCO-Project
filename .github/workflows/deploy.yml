@@ -152,7 +152,7 @@ jobs:
     needs: build-and-push
 
     steps:
-      # ----- Deploy via ASG Instance Refresh ------------------------------
+      # ----- Deploy via EKS -----------------------------------------------
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -160,25 +160,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Start ASG Instance Refresh
+      - name: Update KubeConfig
+        run: |
+          aws eks update-kubeconfig --name dco-cluster --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to EKS
         run: |
           set -euxo pipefail
-          echo ">>> Triggering Auto Scaling Group Instance Refresh..."
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name dco-asg \
-            --strategy Rolling \
-            --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 120}'
-
-          echo ">>> Instance refresh started successfully. The new Docker image will be pulled by the new instances."
+          echo ">>> Triggering EKS Deployment Rollout..."
+          
+          # We use rollout restart so it pulls the latest image tag from ECR
+          kubectl rollout restart deployment dco-api -n dco-app
+          kubectl rollout status deployment dco-api -n dco-app
+          
+          echo ">>> EKS deployment updated successfully!"
 
       # ----- Deployment summary -------------------------------------------
       - name: Deployment summary
         run: |
-          echo "### 🚀 Deployment Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target ASG** | \`dco-asg\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Status** | Rolling Refresh Started |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Cluster** | \`dco-cluster\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | Rolling Restart Complete |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dco-api
+  namespace: dco-app
+  labels:
+    app: dco-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dco-api
+  template:
+    metadata:
+      labels:
+        app: dco-api
+    spec:
+      containers:
+        - name: dco-api
+          image: 728905193550.dkr.ecr.us-east-1.amazonaws.com/dco-image-processing-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: S3_BUCKET_NAME
+              value: "dco-image-processing-bucket"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
