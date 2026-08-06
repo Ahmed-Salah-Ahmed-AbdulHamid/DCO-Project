@@ -102,79 +102,86 @@ async def health_check():
 
 
 @app.post("/upload", tags=["Image Processing"])
-async def upload_image(file: UploadFile = File(..., description="Image file to process and upload")):
+async def upload_images(files: list[UploadFile] = File(..., description="Up to 20 image files to process and upload")):
     """
-    Accept an image upload, resize it to a 128×128 thumbnail, and store the
-    result in AWS S3.
-
-    **Supported formats:** JPEG, PNG, GIF, WebP, BMP
-
-    Returns the public S3 URL of the uploaded thumbnail.
+    Accept up to 20 image uploads, resize them to 128x128 thumbnails, and store them in AWS S3.
     """
-    # --- Validate content type (input validation first) ---------------------
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    if len(files) > 20:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type '{file.content_type}'. Allowed: {', '.join(sorted(ALLOWED_CONTENT_TYPES))}",
+            detail="You can only upload up to 20 images at a time."
         )
 
-    # --- Read and validate size --------------------------------------------
-    image_bytes = await file.read()
-    size_mb = len(image_bytes) / (1024 * 1024)
-    if size_mb > MAX_UPLOAD_SIZE_MB:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large ({size_mb:.1f} MB). Maximum allowed is {MAX_UPLOAD_SIZE_MB} MB.",
-        )
+    results = []
 
-    # --- Guard: S3 client must be available --------------------------------
-    if s3_client is None:
-        raise HTTPException(
-            status_code=503,
-            detail="S3 client is not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
-        )
+    for file in files:
+        # --- Validate content type ----------------------------------------------
+        if file.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{file.content_type}' for file '{file.filename}'. Allowed: {', '.join(sorted(ALLOWED_CONTENT_TYPES))}",
+            )
 
-    # --- Resize to thumbnail -----------------------------------------------
-    try:
-        thumbnail_buffer = resize_image_to_thumbnail(image_bytes, size=(128, 128))
-    except Exception as exc:
-        logger.error("Image processing failed: %s", exc)
-        raise HTTPException(status_code=422, detail=f"Failed to process image: {exc}")
+        # --- Read and validate size --------------------------------------------
+        image_bytes = await file.read()
+        size_mb = len(image_bytes) / (1024 * 1024)
+        if size_mb > MAX_UPLOAD_SIZE_MB:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{file.filename}' is too large ({size_mb:.1f} MB). Maximum allowed is {MAX_UPLOAD_SIZE_MB} MB.",
+            )
 
-    # --- Upload to S3 -------------------------------------------------------
-    s3_key = generate_s3_key(file.filename or "image")
-    try:
-        s3_client.put_object(
-            Bucket=S3_BUCKET_NAME,
-            Key=s3_key,
-            Body=thumbnail_buffer.getvalue(),
-            ContentType="image/png",
-        )
-    except (BotoCoreError, ClientError) as exc:
-        logger.error("S3 upload failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}")
+        # --- Guard: S3 client must be available --------------------------------
+        if s3_client is None:
+            raise HTTPException(
+                status_code=503,
+                detail="S3 client is not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
+            )
 
-    # Generate presigned URL for secure frontend access
-    try:
-        s3_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
-            ExpiresIn=3600
-        )
-    except Exception as exc:
-        logger.error("Failed to generate presigned URL: %s", exc)
-        s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+        # --- Resize to thumbnail -----------------------------------------------
+        try:
+            thumbnail_buffer = resize_image_to_thumbnail(image_bytes, size=(128, 128))
+        except Exception as exc:
+            logger.error("Image processing failed for %s: %s", file.filename, exc)
+            raise HTTPException(status_code=422, detail=f"Failed to process image '{file.filename}': {exc}")
 
-    logger.info("Thumbnail uploaded → %s", s3_key)
+        # --- Upload to S3 -------------------------------------------------------
+        s3_key = generate_s3_key(file.filename or "image")
+        try:
+            s3_client.put_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=s3_key,
+                Body=thumbnail_buffer.getvalue(),
+                ContentType="image/png",
+            )
+        except (BotoCoreError, ClientError) as exc:
+            logger.error("S3 upload failed for %s: %s", file.filename, exc)
+            raise HTTPException(status_code=502, detail=f"S3 upload failed for '{file.filename}': {exc}")
+
+        # Generate presigned URL for secure frontend access
+        try:
+            s3_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
+                ExpiresIn=3600
+            )
+        except Exception as exc:
+            logger.error("Failed to generate presigned URL: %s", exc)
+            s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+
+        logger.info("Thumbnail uploaded → %s", s3_key)
+        
+        results.append({
+            "original_filename": file.filename,
+            "s3_url": s3_url,
+            "s3_key": s3_key
+        })
 
     return JSONResponse(
         status_code=201,
         content={
-            "message": "Image processed and uploaded successfully.",
-            "original_filename": file.filename,
-            "thumbnail_size": "128x128",
-            "s3_url": s3_url,
-            "s3_key": s3_key,
+            "message": f"{len(files)} image(s) processed and uploaded successfully.",
+            "results": results
         },
     )
 

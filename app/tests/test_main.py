@@ -119,7 +119,7 @@ class TestUploadEndpoint:
     def test_upload_rejects_non_image(self):
         response = client.post(
             "/upload",
-            files={"file": ("test.txt", b"not an image", "text/plain")},
+            files=[("files", ("test.txt", b"not an image", "text/plain"))],
         )
         assert response.status_code == 400
         assert "Unsupported file type" in response.json()["detail"]
@@ -132,16 +132,18 @@ class TestUploadEndpoint:
 
         response = client.post(
             "/upload",
-            files={"file": ("test.png", image_buf, "image/png")},
+            files=[("files", ("test.png", image_buf, "image/png"))],
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["message"] == "Image processed and uploaded successfully."
-        assert data["original_filename"] == "test.png"
-        assert data["thumbnail_size"] == "128x128"
-        assert "s3_url" in data
-        assert "s3_key" in data
+        assert "1 image(s) processed" in data["message"]
+        
+        results = data["results"]
+        assert len(results) == 1
+        assert results[0]["original_filename"] == "test.png"
+        assert "s3_url" in results[0]
+        assert "s3_key" in results[0]
 
     def test_upload_returns_correct_s3_key_prefix(self, mock_s3_client):
         mock_s3_client.put_object.return_value = {}
@@ -150,12 +152,12 @@ class TestUploadEndpoint:
 
         response = client.post(
             "/upload",
-            files={"file": ("photo.jpg", image_buf, "image/jpeg")},
+            files=[("files", ("photo.jpg", image_buf, "image/jpeg"))],
         )
 
         data = response.json()
-        assert data["s3_key"].startswith("thumbnails/")
-        assert "photo" in data["s3_key"]
+        assert data["results"][0]["s3_key"].startswith("thumbnails/")
+        assert "photo" in data["results"][0]["s3_key"]
 
 
 # =========================================================================

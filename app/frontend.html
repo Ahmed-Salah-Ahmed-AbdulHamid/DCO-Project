@@ -335,7 +335,7 @@
                     <span style="font-size: 2rem; display:block; margin-bottom: 0.5rem">📥</span>
                     Drag & Drop or Click to Browse
                 </div>
-                <input type="file" id="file-input" accept="image/*">
+                <input type="file" id="file-input" accept="image/*" multiple>
             </div>
 
             <button class="btn" id="upload-btn">
@@ -346,8 +346,8 @@
             
             <!-- Image Preview Container -->
             <div id="image-preview-container" style="display: none; margin-top: 1.5rem; text-align: center;">
-                <p style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 600;">Generated Thumbnail (128x128):</p>
-                <img id="image-preview" src="" alt="Thumbnail Preview" style="border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 128px; max-height: 128px; border: 2px solid rgba(255,255,255,0.1);">
+                <p style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 600;">Generated Thumbnail(s):</p>
+                <div id="image-preview-list" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;"></div>
             </div>
         </div>
 
@@ -415,14 +415,17 @@
         const uploadLoader = document.getElementById('upload-loader');
         const uploadText = document.getElementById('upload-text');
         const imagePreviewContainer = document.getElementById('image-preview-container');
-        const imagePreview = document.getElementById('image-preview');
+        const imagePreviewList = document.getElementById('image-preview-list');
 
-        let selectedFile = null;
+        let selectedFiles = [];
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+                selectedFiles = Array.from(e.target.files).slice(0, 20);
+                if (e.target.files.length > 20) {
+                    alert("Only the first 20 images will be uploaded.");
+                }
+                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFiles.length} file(s)</span> selected`;
                 imagePreviewContainer.style.display = 'none';
             }
         });
@@ -440,23 +443,33 @@
             e.preventDefault();
             dropZone.style.borderColor = 'rgba(255, 255, 255, 0.2)';
             if (e.dataTransfer.files.length > 0) {
-                selectedFile = e.dataTransfer.files[0];
-                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFile.name}</span> selected`;
+                selectedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 20);
+                if (selectedFiles.length === 0) {
+                    showResult(uploadResult, 'Please select valid image files.', true);
+                    return;
+                }
+                if (e.dataTransfer.files.length > 20) {
+                    alert("Only the first 20 images will be uploaded.");
+                }
+                dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFiles.length} file(s)</span> selected`;
                 imagePreviewContainer.style.display = 'none';
             }
         });
 
         uploadBtn.addEventListener('click', async () => {
-            if (!selectedFile) {
-                showResult(uploadResult, 'Please select a file first.', true);
+            if (selectedFiles.length === 0) {
+                showResult(uploadResult, 'Please select at least one file first.', true);
                 return;
             }
 
             const formData = new FormData();
-            formData.append('file', selectedFile);
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
 
             setLoading(uploadBtn, uploadText, uploadLoader, true);
             imagePreviewContainer.style.display = 'none';
+            imagePreviewList.innerHTML = '';
             
             try {
                 const res = await fetch('/upload', {
@@ -466,8 +479,14 @@
                 const data = await res.json();
                 
                 if (res.ok) {
-                    showResult(uploadResult, `✅ Success!`, false);
-                    imagePreview.src = data.s3_url;
+                    showResult(uploadResult, `✅ ${data.message}`, false);
+                    data.results.forEach(r => {
+                        const img = document.createElement('img');
+                        img.src = r.s3_url;
+                        img.title = r.original_filename;
+                        img.style = "border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); max-width: 80px; max-height: 80px; border: 1px solid rgba(255,255,255,0.2);";
+                        imagePreviewList.appendChild(img);
+                    });
                     imagePreviewContainer.style.display = 'block';
                 } else {
                     showResult(uploadResult, `❌ Error: ${data.detail || 'Upload failed'}`, true);
