@@ -421,9 +421,9 @@
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                selectedFiles = Array.from(e.target.files).slice(0, 20);
-                if (e.target.files.length > 20) {
-                    alert("Only the first 20 images will be uploaded.");
+                selectedFiles = Array.from(e.target.files).slice(0, 150);
+                if (e.target.files.length > 150) {
+                    alert("Only the first 150 images will be uploaded.");
                 }
                 dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFiles.length} file(s)</span> selected`;
                 imagePreviewContainer.style.display = 'none';
@@ -443,13 +443,13 @@
             e.preventDefault();
             dropZone.style.borderColor = 'rgba(255, 255, 255, 0.2)';
             if (e.dataTransfer.files.length > 0) {
-                selectedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 20);
+                selectedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 150);
                 if (selectedFiles.length === 0) {
                     showResult(uploadResult, 'Please select valid image files.', true);
                     return;
                 }
-                if (e.dataTransfer.files.length > 20) {
-                    alert("Only the first 20 images will be uploaded.");
+                if (e.dataTransfer.files.length > 150) {
+                    alert("Only the first 150 images will be uploaded.");
                 }
                 dropText.innerHTML = `<span style="color: #60a5fa; font-weight:600;">${selectedFiles.length} file(s)</span> selected`;
                 imagePreviewContainer.style.display = 'none';

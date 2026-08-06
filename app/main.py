@@ -102,14 +102,14 @@ async def health_check():
 
 
 @app.post("/upload", tags=["Image Processing"])
-async def upload_images(files: list[UploadFile] = File(..., description="Up to 20 image files to process and upload")):
+async def upload_images(files: list[UploadFile] = File(..., description="Up to 150 image files to process and upload")):
     """
-    Accept up to 20 image uploads, resize them to 128x128 thumbnails, and store them in AWS S3.
+    Accept up to 150 image uploads, resize them to 128x128 thumbnails, and store them in AWS S3.
     """
-    if len(files) > 20:
+    if len(files) > 150:
         raise HTTPException(
             status_code=400,
-            detail="You can only upload up to 20 images at a time."
+            detail="You can only upload up to 150 images at a time."
         )
 
     results = []
