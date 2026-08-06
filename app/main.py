@@ -83,13 +83,15 @@ app = FastAPI(
 import pathlib
 from fastapi.responses import HTMLResponse
 
-@app.get("/", tags=["General"], response_class=HTMLResponse)
-async def root():
-    """Welcome endpoint — returns the modern HTML frontend."""
-    html_path = pathlib.Path(__file__).parent / "frontend.html"
-    if html_path.exists():
-        return HTMLResponse(content=html_path.read_text(encoding="utf-8"), status_code=200)
-    return HTMLResponse(content="<h1>Frontend UI not found</h1>", status_code=404)
+@app.get("/", response_class=HTMLResponse, tags=["UI"])
+async def root(request: Request):
+    """Serve the main frontend UI."""
+    return templates.TemplateResponse("frontend.html", {"request": request})
+
+@app.get("/analytics", response_class=HTMLResponse, tags=["UI"])
+async def analytics(request: Request):
+    """Serve the Analytics Dashboard UI."""
+    return templates.TemplateResponse("analytics.html", {"request": request})
 
 
 @app.get("/health", tags=["General"])
