@@ -517,15 +517,16 @@
         const extremeLoader = document.getElementById('extreme-loader');
 
         extremeBtn.addEventListener('click', async () => {
+            const duration = slider.value;
             setLoading(extremeBtn, extremeText, extremeLoader, true);
-            showResult(stressResult, `⚠️ Sending 10 parallel heavy requests to peg CPU at 100%...`, false);
+            showResult(stressResult, `⚠️ Sending 10 parallel heavy requests to peg CPU at 100% for ${duration}s...`, false);
             stressResult.style.color = '#f59e0b';
             
             try {
-                // Fire 10 parallel requests of 20 seconds each
+                // Fire 10 parallel requests
                 const promises = [];
                 for (let i = 0; i < 10; i++) {
-                    promises.push(fetch(`/stress?duration=20`));
+                    promises.push(fetch(`/stress?duration=${duration}`));
                 }
                 
                 // Wait for all to finish
