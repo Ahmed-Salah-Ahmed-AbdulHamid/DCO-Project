@@ -35,6 +35,22 @@ module "eks" {
   # Grant cluster admin permissions to the Terraform runner (the current user)
   enable_cluster_creator_admin_permissions = true
 
+  access_entries = {
+    github_actions = {
+      kubernetes_groups = []
+      principal_arn     = data.aws_iam_user.github_actions.arn
+
+      policy_associations = {
+        cluster_admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type       = "cluster"
+          }
+        }
+      }
+    }
+  }
+
   # Managed Node Group
   eks_managed_node_groups = {
     dco_nodes = {
@@ -51,6 +67,7 @@ module "eks" {
       iam_role_additional_policies = {
         AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
         AmazonS3FullAccess           = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        ClusterAutoscaler            = aws_iam_policy.cluster_autoscaler.arn
       }
     }
   }
