@@ -214,7 +214,9 @@ def stress_test(
 @app.get("/resources", tags=["DevOps / Testing"])
 def get_resources():
     """Returns live CPU and Memory utilization for the dashboard."""
+    # interval=None averages the CPU usage since the last time this was called.
+    # Since the frontend polls every 2 seconds, this gives a smooth 2-second average!
     return {
-        "cpu_percent": psutil.cpu_percent(interval=0.1),
+        "cpu_percent": psutil.cpu_percent(interval=None),
         "memory_percent": psutil.virtual_memory().percent
     }
