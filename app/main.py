@@ -102,7 +102,7 @@ async def health_check():
 
 
 @app.post("/upload", tags=["Image Processing"])
-async def upload_images(files: list[UploadFile] = File(..., description="Up to 150 image files to process and upload")):
+def upload_images(files: list[UploadFile] = File(..., description="Up to 150 image files to process and upload")):
     """
     Accept up to 150 image uploads, resize them to 128x128 thumbnails, and store them in AWS S3.
     """
@@ -123,7 +123,7 @@ async def upload_images(files: list[UploadFile] = File(..., description="Up to 1
             )
 
         # --- Read and validate size --------------------------------------------
-        image_bytes = await file.read()
+        image_bytes = file.file.read()
         size_mb = len(image_bytes) / (1024 * 1024)
         if size_mb > MAX_UPLOAD_SIZE_MB:
             raise HTTPException(
@@ -212,7 +212,7 @@ def stress_test(
 
 
 @app.get("/resources", tags=["DevOps / Testing"])
-async def get_resources():
+def get_resources():
     """Returns live CPU and Memory utilization for the dashboard."""
     return {
         "cpu_percent": psutil.cpu_percent(interval=0.1),
