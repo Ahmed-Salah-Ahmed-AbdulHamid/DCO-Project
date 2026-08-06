@@ -86,11 +86,12 @@ def cpu_stress_task(duration_seconds: int = 5) -> dict:
     import multiprocessing
     import os
 
+    ctx = multiprocessing.get_context('spawn')
     num_workers = os.cpu_count() or 1
     start = time.time()
 
     # Spawn one process per CPU core, each burning CPU independently
-    with multiprocessing.Pool(processes=num_workers) as pool:
+    with ctx.Pool(processes=num_workers) as pool:
         results = pool.starmap(
             _burn_cpu,
             [(duration_seconds,)] * num_workers
