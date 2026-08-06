@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, Request
 from fastapi.responses import JSONResponse
 import psutil
+import httpx
 
 from utils import cpu_stress_task, generate_s3_key, resize_image_to_thumbnail
 
@@ -220,10 +221,35 @@ def stress_test(
 
 
 @app.get("/resources", tags=["DevOps / Testing"])
-def get_resources():
-    """Returns live CPU and Memory utilization for the dashboard."""
-    # interval=None averages the CPU usage since the last time this was called.
-    # Since the frontend polls every 2 seconds, this gives a smooth 2-second average!
+async def get_resources():
+    """Returns live CPU and Memory utilization.
+    When running in Kubernetes, queries Prometheus for exact cluster-wide metrics.
+    Falls back to local psutil if Prometheus is unreachable.
+    """
+    PROM_URL = "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query"
+    cpu_query = 'sum(rate(container_cpu_usage_seconds_total{namespace="dco-app",container="dco-api"}[1m]))/sum(kube_pod_container_resource_limits{namespace="dco-app",container="dco-api",resource="cpu"})*100'
+    mem_query = 'sum(container_memory_working_set_bytes{namespace="dco-app",container="dco-api"})/sum(kube_pod_container_resource_limits{namespace="dco-app",container="dco-api",resource="memory"})*100'
+
+    try:
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            cpu_res = await client.get(PROM_URL, params={"query": cpu_query})
+            mem_res = await client.get(PROM_URL, params={"query": mem_query})
+            
+            if cpu_res.status_code == 200 and mem_res.status_code == 200:
+                cpu_data = cpu_res.json()
+                mem_data = mem_res.json()
+                
+                cpu_val = float(cpu_data['data']['result'][0]['value'][1]) if cpu_data['data']['result'] else 0.0
+                mem_val = float(mem_data['data']['result'][0]['value'][1]) if mem_data['data']['result'] else 0.0
+                
+                return {
+                    "cpu_percent": round(cpu_val, 2),
+                    "memory_percent": round(mem_val, 2)
+                }
+    except Exception as e:
+        logging.warning(f"Failed to fetch from Prometheus, falling back to psutil: {e}")
+
+    # Fallback for local development or if Prometheus is unreachable
     return {
         "cpu_percent": psutil.cpu_percent(interval=None),
         "memory_percent": psutil.virtual_memory().percent
