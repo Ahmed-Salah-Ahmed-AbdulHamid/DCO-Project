@@ -519,20 +519,19 @@
         extremeBtn.addEventListener('click', async () => {
             const duration = slider.value;
             setLoading(extremeBtn, extremeText, extremeLoader, true);
-            showResult(stressResult, `⚠️ Sending 10 parallel heavy requests to peg CPU at 100% for ${duration}s...`, false);
+            showResult(stressResult, `⚠️ Sending extreme heavy request to peg CPU at 100% for ${duration}s...`, false);
             stressResult.style.color = '#f59e0b';
             
             try {
-                // Fire 10 parallel requests
-                const promises = [];
-                for (let i = 0; i < 10; i++) {
-                    promises.push(fetch(`/stress?duration=${duration}`));
+                // One request is enough to peg CPU since backend spawns processes per core
+                const res = await fetch(`/stress?duration=${duration}`);
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult(stressResult, `✅ Extreme Stress Completed! Auto Scaling should be triggering soon.`, false);
+                } else {
+                    showResult(stressResult, `❌ Error: ${data.detail}`, true);
                 }
-                
-                // Wait for all to finish
-                await Promise.all(promises);
-                
-                showResult(stressResult, `✅ Extreme Stress Completed! Auto Scaling should be triggering soon.`, false);
             } catch (err) {
                 showResult(stressResult, `❌ Extreme Stress Failed (Network Error / Timeout)`, true);
             } finally {
