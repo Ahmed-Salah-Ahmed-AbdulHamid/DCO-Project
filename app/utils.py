@@ -33,7 +33,21 @@ def resize_image_to_thumbnail(
     if image.mode in ("RGBA", "P", "LA"):
         image = image.convert("RGB")
 
+    # Resize first to avoid massive memory usage on 4K images
     image.thumbnail(size, Image.Resampling.LANCZOS)
+    
+    # --- SIMULATE HEAVY AI PROCESSING (CPU STRESS) ---
+    # Apply complex filters multiple times to simulate a heavy workload
+    # like a Machine Learning pipeline (Feature Extraction, etc.)
+    from PIL import ImageFilter
+    for _ in range(5):
+        image = image.filter(ImageFilter.GaussianBlur(radius=2))
+        image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150))
+    
+    # Add a tight math loop to guarantee CPU spike per image
+    for j in range(150000):
+        _ = math.sqrt(j) * math.sin(j) * math.cos(j)
+    # -------------------------------------------------
 
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
