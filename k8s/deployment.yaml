@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: dco-api
-          image: 728905193550.dkr.ecr.us-east-1.amazonaws.com/dco-image-processing-api:latest
+          image: 728905193550.dkr.ecr.us-east-1.amazonaws.com/dco-image-processing-api:028af15e6945d902e244e45661dc505d8ac08693
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -28,7 +28,7 @@ spec:
               value: "dco-image-processing-bucket"
           resources:
             requests:
-              cpu: "200m"
+              cpu: "400m"
               memory: "256Mi"
             limits:
               cpu: "1000m"
