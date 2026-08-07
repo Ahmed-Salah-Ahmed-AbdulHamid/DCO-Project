@@ -302,7 +302,7 @@
     <main class="container">
         <!-- Dashboard Card (NEW) -->
         <div class="card animate-up delay-1">
-            <h2>📈 Live Resource Dashboard</h2>
+            <h2> Live Resource Dashboard</h2>
             <p>Real-time telemetry from the AWS EC2 instance running this FastAPI service.</p>
             
             <div style="margin-bottom: 1.5rem;">
@@ -332,7 +332,7 @@
 
         <!-- Upload Card -->
         <div class="card animate-up delay-2">
-            <h2>✨ Image Processing</h2>
+            <h2> Image Processing</h2>
             <p>Upload any high-res image. The DCO pipeline will dynamically resize it to a thumbnail and securely store it in your AWS S3 Bucket.</p>
             
             <div class="file-drop" id="drop-zone" onclick="document.getElementById('file-input').click()">
@@ -358,8 +358,8 @@
 
         <!-- Stress Test Card -->
         <div class="card animate-up delay-3">
-            <h2>🔥 CPU Stress Test</h2>
-            <p>Simulate high computational loads to trigger AWS CloudWatch alarms and Auto Scaling Group (ASG) scale-out events.</p>
+            <h2> CPU Stress Test</h2>
+            <p>Simulate high computational loads to start AWS CloudWatch alarms and Auto Scaling Group (ASG) scale-out events.</p>
             
             <div class="slider-container">
                 <label>
@@ -370,11 +370,11 @@
             </div>
 
             <button class="btn" id="stress-btn" style="background: linear-gradient(135deg, #f43f5e, #e11d48);">
-                <span id="stress-text">Trigger CPU Load</span>
+                <span id="stress-text">Start CPU Load</span>
                 <div class="loader" id="stress-loader"></div>
             </button>
             <button class="btn btn-extreme" id="extreme-btn">
-                <span id="extreme-text">🔥 Extreme Stress</span>
+                <span id="extreme-text"> Extreme Stress</span>
                 <div class="loader" id="extreme-loader"></div>
             </button>
             <div class="result-box" id="stress-result"></div>
@@ -552,7 +552,7 @@
                 const data = await res.json();
                 
                 if (res.ok) {
-                    showResult(stressResult, `✅ Extreme Stress Completed! Auto Scaling should be triggering soon.`, false);
+                    showResult(stressResult, `✅ Extreme Stress Completed! Auto Scaling should be starting soon.`, false);
                 } else {
                     showResult(stressResult, `❌ Error: ${data.detail}`, true);
                 }
